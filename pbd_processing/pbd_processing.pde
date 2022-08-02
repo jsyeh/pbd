@@ -14,8 +14,8 @@ class Particle{
     w = 1;
   }
   Particle( float _x, float _y, float _vx, float _vy ){
-    this( _x, _y, 0.0, _vx, _vy, 0.0);
-  }
+    this( _x, _y, random(-0.1,+0.1), _vx, _vy, 0.0);
+  } //z 值 random() 擾動,可讓布料跳脫原本2D世界, 讓布的變化變立體!!!
   Particle( float _x, float _y ){
     this( _x, _y, 0.0, 0.0 );
   }
@@ -41,21 +41,27 @@ ArrayList<Stick> sticks;
 ArrayList<Particle> particles;
 ArrayList<Triangle> triangles;
 void setup(){
-  size(500,500);
-  generateCloth(400, 400, 10, 10); //這裡可調解析度,方便debug
+  size(500, 500, P3D); //為了打光lights(), 所以改成 P3D
+  generateCloth(400, 400, 20, 20); //這裡可調解析度,方便debug
 }
 void draw(){
+  lights(); //想加上打光,不過三角面用半透明的話,有點怪怪的
   background(#FFFFF2);
   translate(width/2, height/2);
   for( Triangle t : triangles ){
     PVector p0 = t.p[0].x, p1 = t.p[1].x, p2 = t.p[2].x;
     fill(255, 0, 0, 128); noStroke();
-    triangle( p0.x, p0.y, p1.x, p1.y, p2.x, p2.y );
+    //triangle( p0.x, p0.y, p1.x, p1.y, p2.x, p2.y );
+    beginShape(); //因為想畫出3D的效果, 所以把 triangle()改成 vertex()
+      vertex(p0.x, p0.y, p0.z);
+      vertex(p1.x, p1.y, p1.z);
+      vertex(p2.x, p2.y, p2.z);
+    endShape();
   }
   for( Stick s : sticks ){
     PVector p1 = s.p1.x, p2=s.p2.x;
     stroke(255,0,0);
-    line( p1.x, p1.y, p2.x, p2.y );
+    line( p1.x, p1.y, p1.z, p2.x, p2.y, p2.z); //因為想變3D效果,所以加上z座標
   }
   for( Particle p : particles ){
     PVector pt = p.x;
@@ -63,15 +69,15 @@ void draw(){
     if(p.locked){
       fill(#FF0000);
       ellipse( pt.x, pt.y, 7, 7); //固定的點畫大一點(locked)
-    }else{
-      noFill();
-      ellipse( pt.x, pt.y, 3, 3 );
-    }
+    }//else{ //因為 ellipse是2D的, 可能被立體布料擋到, 所以註解掉
+      //noFill();
+      //ellipse( pt.x, pt.y, 3, 3 );
+    //}
   }
-  if(mousePressed) Simulation(); //設計成「按下才模擬」方便找問題
+  Simulation();
 }
 void Simulation(){
-  PVector gravity = new PVector(0, 0.98, 0);
+  PVector gravity = new PVector(0, 0.98, 0); //像地球 vs.月球: 重力不同, 布飄動的結果不同
   for( Particle p : particles ){ //update external force
     if(p.locked) continue; //skip locked particle
     p.v.add( gravity ); //(5) vi += dt*wi*fext(xi)
@@ -170,4 +176,9 @@ void generateCloth(float w, float h, int wr, int hr){
 float C(Stick s){
   Particle p1 = s.p1, p2 = s.p2;
   return PVector.dist(p1.p, p2.p) - s.len; //先將d設成40
+}
+void mouseDragged(){ //讓布料的左上角,可以隨著 mouseDragged()移動
+  Particle p = particles.get(0);
+  p.p.x = p.x.x=mouseX-width/2;
+  p.p.y = p.x.y=mouseY-height/2;
 }
