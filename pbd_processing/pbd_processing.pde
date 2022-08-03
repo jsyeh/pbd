@@ -77,6 +77,9 @@ void draw(){
   Simulation();
 }
 void Simulation(){
+  float stiffness = 0.98; //照著 section 3.3 最後整合 solverIterations 及 stiffness
+  int ns = 10; // number of solverIterations
+  float k2 = 1 - pow(1-stiffness, 1.0/ns); //照著 section 3.3 最後的公式, 算出k' 
   PVector gravity = new PVector(0, 0.98, 0); //像地球 vs.月球: 重力不同, 布飄動的結果不同
   for( Particle p : particles ){ //update external force
     if(p.locked) continue; //skip locked particle
@@ -85,8 +88,8 @@ void Simulation(){
     p.p = PVector.add(p.x, p.v); //(7) pi = xi + dt*vi
  }
   //(8) generateCollisionConstraints()
-  for(int k=0; k<20; k++){ //(9) solverIterations 越多次,越剛直
-    projectConstraints(); //(10) projectConstraints() in Gauss-Seidel fashion
+  for(int k=0; k<ns; k++){ //(9) solverIterations 越多次,越剛直, 所以用k2來修正回來
+    projectConstraints(k2); //(10) projectConstraints() in Gauss-Seidel fashion
   }
   for( Particle p : particles ){//(12) forall vertices i
     p.v = PVector.sub(p.p, p.x); //(13) vi = (pi-xi)/dt
@@ -96,7 +99,7 @@ void Simulation(){
   }
   //(16) velocityUpdate()
 }
-void projectConstraints(){
+void projectConstraints(float k2){
   //下面用不同的迴圈寫法,來檢查不同順序的結果
   //for( Stick s : sticks ){ //模擬時,可能因順序問題,結果不對稱
   for( int i=0; i<sticks.size(); i++){ //從頭到尾, 頭的地方會扭曲
@@ -105,8 +108,8 @@ void projectConstraints(){
     Particle p1 = s.p1, p2 = s.p2;
     float C = C(s);
     PVector n = PVector.sub(p1.p, p2.p).normalize();
-    PVector dp1 = PVector.mult(n, -p1.w/(p1.w+p2.w)*C);
-    PVector dp2 = PVector.mult(n, +p2.w/(p1.w+p2.w)*C);
+    PVector dp1 = PVector.mult(n, -p1.w/(p1.w+p2.w)*C*k2);
+    PVector dp2 = PVector.mult(n, +p2.w/(p1.w+p2.w)*C*k2);
     p1.p.add(dp1);
     p2.p.add(dp2);
   }
