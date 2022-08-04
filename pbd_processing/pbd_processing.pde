@@ -56,6 +56,15 @@ void draw(){
     fill(255);
     sphere(100);
   popMatrix();
+  if(Q_c!=null){ //有collision發生時, 用小圓球把表面接觸點標示出來
+    for( PVector q_c : Q_c ){
+      pushMatrix();
+        translate(q_c.x, q_c.y, q_c.z);
+        fill(255,0,0);
+        sphere(5);
+      popMatrix();
+    }
+  }
   for( Triangle t : triangles ){
     PVector p0 = t.p[0].x, p1 = t.p[1].x, p2 = t.p[2].x;
     fill(255, 0, 0, 128); noStroke();
@@ -77,10 +86,7 @@ void draw(){
     if(p.locked){
       fill(#FF0000);
       ellipse( pt.x, pt.y, 7, 7); //固定的點畫大一點(locked)
-    }//else{ //因為 ellipse是2D的, 可能被立體布料擋到, 所以註解掉
-      //noFill();
-      //ellipse( pt.x, pt.y, 3, 3 );
-    //}
+    }
   }
   if(mousePressed) Simulation();
 }
@@ -95,7 +101,7 @@ void Simulation(){
     p.v.mult(0.9); //先變小//(6) dampVelocities()
     p.p = PVector.add(p.x, p.v); //(7) pi = xi + dt*vi
   }
-  //(8) generateCollisionConstraints()
+  generateCollisionConstraints(); //(8) generateCollisionConstraints()
   for(int k=0; k<ns; k++){ //(9) solverIterations 越多次,越剛直, 所以用k2來修正回來
     projectConstraints(k2); //(10) projectConstraints() in Gauss-Seidel fashion
   }
@@ -106,6 +112,47 @@ void Simulation(){
     p.x.z = p.p.z;
   }
   //(16) velocityUpdate()
+}
+ArrayList<PVector> Q_c=null;
+void generateCollisionConstraints(){
+  if(Q_c==null) Q_c = new ArrayList<PVector>();
+  else Q_c.removeAll(Q_c);
+  for( Particle p : particles ){
+    if( PVector.dist(p.p, sphere)<100 ){ //estimated position 在圓球裡
+      PVector q_c = calcContactPoint(sphere, p.x, p.p); //2種collision都在函式中解決
+      Q_c.add(q_c);
+    }
+  }
+  println(Q_c.size());
+}
+PVector calcContactPoint(PVector sphere, PVector x0, PVector p){ //已知: estimated position 在圓球裡
+  //q_c contact point, n_c normal at contact point (continuous collision) 一裡一外
+  //q_s surface point, n_s normal at surface point (static collision) 兩點都在裡面
+  if( PVector.dist(x0, sphere)<100 ){ //position 也在圓球裡, 用 static collision
+    print("+"); //static collision
+    PVector q_c = PVector.add( sphere, PVector.sub(p, sphere).normalize().mult(100) );//找p最近的圓球表面
+    return q_c;
+  }//下面則是一裡一外的狀況
+  PVector ray = PVector.sub(p, x0);
+  // x = x0.x+d*ray.x, y = x0.y+d*ray.y, z = x0.z+d*ray.z 直線方程式(x0 + d * ray)
+  // (x-sphere.x)^2 + (y-sphere.y)^2 + (z-sphere.z)^2 = 100^2 把點代入圓球表面方程式
+  // (x0.x+d*ray.x-sphere.x)^2 + (...)^2 + (...)^2 - 100000 = 0 努力展開
+  // d^2 * (...) + d * (...) + (...) = 0 把 d^2, d^1, d^0 項分開
+  // d = (-b+- sqrt(b*b-4*a*c) ) /(2*a) 套用一元二次方程式 的公式解
+  float a = ray.x*ray.x + ray.y*ray.y + ray.z*ray.z;
+  float b = 2*ray.x*(x0.x-sphere.x) + 2*ray.y*(x0.y-sphere.y) + 2*ray.z*(x0.z-sphere.z);
+  float c = (x0.x-sphere.x)*(x0.x-sphere.x) + (x0.y-sphere.y)*(x0.y-sphere.y) + (x0.z-sphere.z)*(x0.z-sphere.z) - 10000;
+  float inside = b*b-4*a*c; //這是要開根號的部分, 應該要大於0。但如果小於0, 那就無法解, 改找 p最近的圓球表面
+  if(inside<0){
+    print("出錯了出錯了");
+    PVector q_c = PVector.add( sphere, PVector.sub(p, sphere).normalize().mult(100) );//找p最近的圓球表面
+    return q_c;
+  }
+  print("="); //continuous collision
+  float d1 = (-b + sqrt(inside)) / (2*a);
+  float d2 = (-b - sqrt(inside)) / (2*a);
+  if( abs(d1) > abs(d2) ) return PVector.add(x0, PVector.mult(ray,d2));
+  else return PVector.add(x0, PVector.mult(ray,d1));
 }
 void projectConstraints(float k2){
   //下面用不同的迴圈寫法,來檢查不同順序的結果
