@@ -56,25 +56,31 @@ void setup(){
   sphere = new PVector(0, 0, -100); //有一個大球, 用來研究 Collision Constraint
   collisions = new ArrayList<Collision>();
 }
+float rotY=0;
 void draw(){
   lights(); //想加上打光,不過三角面用半透明的話,有點怪怪的
   background(#FFFFF2);
   translate(width/2, height/2);
+  if(keyPressed && keyCode==LEFT) rotY+=radians(1);
+  if(keyPressed && keyCode==RIGHT) rotY-=radians(1);
+  if(keyPressed && keyCode==UP) sphere.z++;
+  if(keyPressed && keyCode==DOWN) sphere.z--;
+  rotateY(rotY);
   pushMatrix();
     translate(sphere.x, sphere.y, sphere.z);
     noStroke();
     fill(255);
-    sphere(100);
+    sphere(97); //畫圓球時故意畫小一點,就不會破圖
   popMatrix();
-  if(collisions!=null){ //有collision發生時, 用小圓球把表面接觸點標示出來
-    for( Collision c : collisions ){
-      pushMatrix();
-        translate(c.q_c.x, c.q_c.y, c.q_c.z);
-        fill(255,0,0);
-        sphere(5);
-      popMatrix();
-    }
-  }
+  //if(collisions!=null){ //有collision發生時, 用小圓球把表面接觸點標示出來
+  //  for( Collision c : collisions ){
+  //    pushMatrix();
+  //      translate(c.q_c.x, c.q_c.y, c.q_c.z);
+  //      fill(255,0,0);
+  //      sphere(5);
+  //    popMatrix();
+  //  }
+  //} //先不要畫這些小球, 讓畫面好看一些
   for( Triangle t : triangles ){
     PVector p0 = t.p[0].x, p1 = t.p[1].x, p2 = t.p[2].x;
     fill(255, 0, 0, 128); noStroke();
@@ -101,7 +107,7 @@ void draw(){
   if( keyPressed || mousePressed ) Simulation(); //「按鍵」也可觸發Simulation()
 }
 void Simulation(){
-  float stiffness = 0.98; //照著 section 3.3 最後整合 solverIterations 及 stiffness
+  float stiffness = 0.99; //照著 section 3.3 最後整合 solverIterations 及 stiffness
   int ns = 10; // number of solverIterations
   float k2 = 1 - pow(1-stiffness, 1.0/ns); //照著 section 3.3 最後的公式, 算出k' 
   PVector gravity = new PVector(0, 0.98, 0); //像地球 vs.月球: 重力不同, 布飄動的結果不同
@@ -144,7 +150,7 @@ PVector calcContactPoint(PVector sphere, PVector x0, PVector p){ //已知: estim
   if( !pInside ) return p; //p在外面, 很好, 直接用p的值
   if( pInside && xInside ){ //position 也在圓球裡, 用 static collision
     print("p"); //push predicted point out directly 直接往外推
-    PVector q_c = PVector.add( sphere, PVector.sub(p, sphere).normalize().mult(100+2) );//找p最近的圓球表面, magic number 遠離一些
+    PVector q_c = PVector.add( sphere, PVector.sub(p, sphere).normalize().mult(100+0) );//找p最近的圓球表面, magic number 遠離一些
     return q_c;
   }//下面則是一裡一外的狀況
   PVector ray = PVector.sub(p, x0).normalize(); //用單位長度,方便之後細調(外推)距離
@@ -159,14 +165,14 @@ PVector calcContactPoint(PVector sphere, PVector x0, PVector p){ //已知: estim
   float inside = b*b-4*a*c; //這是要開根號的部分, 應該要大於0。但如果小於0, 那就無法解, 改找 p最近的圓球表面
   if(inside<0){
     print("出錯了出錯了");
-    PVector q_c = PVector.add( sphere, PVector.sub(p, sphere).normalize().mult(100+2) );//找p最近的圓球表面, magic number 遠離一些
+    PVector q_c = PVector.add( sphere, PVector.sub(p, sphere).normalize().mult(100+0) );//找p最近的圓球表面, magic number 遠離一些
     return q_c;
   }
   print("c"); //continuous collision
   float d1 = (-b + sqrt(inside)) / (2*a);
   float d2 = (-b - sqrt(inside)) / (2*a); //這裡的狀況, 應該是x在外面, p在裡面, 所以 d的值要小一點
-  if( abs(d1) > abs(d2) ) return PVector.add(x0, PVector.mult(ray,d2-2)); // magic number 遠離一些 (但是+1 or -1呢?)
-  else return PVector.add(x0, PVector.mult(ray,d1-2)); // magic number 遠離一些 (但是+1 or -1呢?)
+  if( abs(d1) > abs(d2) ) return PVector.add(x0, PVector.mult(ray,d2-0)); // magic number 遠離一些 (但是+1 or -1呢?)
+  else return PVector.add(x0, PVector.mult(ray,d1-0)); // magic number 遠離一些 (但是+1 or -1呢?)
 }
 void projectConstraints(float k2){
   //下面用不同的迴圈寫法,來檢查不同順序的結果
@@ -278,4 +284,5 @@ void mouseDragged(){ //讓布料的左上角,可以隨著 mouseDragged()移動
 void mouseWheel(MouseEvent event){
   float e = event.getCount();
   sphere.z += e; //利用 mouse wheel 滾輪 調整大班的圓心, 以便測試 Collision
+  Simulation(); //為了方便debug, 暫時加這行
 }
