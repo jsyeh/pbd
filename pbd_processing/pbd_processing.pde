@@ -40,14 +40,22 @@ class Triangle{
 ArrayList<Stick> sticks;
 ArrayList<Particle> particles;
 ArrayList<Triangle> triangles;
+PVector sphere; //用來研究Collision Constraint 的大球
 void setup(){
   size(500, 500, P3D); //為了打光lights(), 所以改成 P3D
   generateCloth(400, 400, 20, 20); //這裡可調解析度,方便debug
+  sphere = new PVector(0, 0, -100); //有一個大球, 用來研究 Collision Constraint
 }
 void draw(){
   lights(); //想加上打光,不過三角面用半透明的話,有點怪怪的
   background(#FFFFF2);
   translate(width/2, height/2);
+  pushMatrix();
+    translate(sphere.x, sphere.y, sphere.z);
+    noStroke();
+    fill(255);
+    sphere(100);
+  popMatrix();
   for( Triangle t : triangles ){
     PVector p0 = t.p[0].x, p1 = t.p[1].x, p2 = t.p[2].x;
     fill(255, 0, 0, 128); noStroke();
@@ -74,7 +82,7 @@ void draw(){
       //ellipse( pt.x, pt.y, 3, 3 );
     //}
   }
-  Simulation();
+  if(mousePressed) Simulation();
 }
 void Simulation(){
   float stiffness = 0.98; //照著 section 3.3 最後整合 solverIterations 及 stiffness
@@ -86,7 +94,7 @@ void Simulation(){
     p.v.add( gravity ); //(5) vi += dt*wi*fext(xi)
     p.v.mult(0.9); //先變小//(6) dampVelocities()
     p.p = PVector.add(p.x, p.v); //(7) pi = xi + dt*vi
- }
+  }
   //(8) generateCollisionConstraints()
   for(int k=0; k<ns; k++){ //(9) solverIterations 越多次,越剛直, 所以用k2來修正回來
     projectConstraints(k2); //(10) projectConstraints() in Gauss-Seidel fashion
@@ -101,10 +109,7 @@ void Simulation(){
 }
 void projectConstraints(float k2){
   //下面用不同的迴圈寫法,來檢查不同順序的結果
-  //for( Stick s : sticks ){ //模擬時,可能因順序問題,結果不對稱
-  for( int i=0; i<sticks.size(); i++){ //從頭到尾, 頭的地方會扭曲
-  //for( int i=sticks.size()-1; i>=0; i--){ //從尾到頭, 尾的地方會扭曲
-    Stick s = sticks.get(i);
+  for( Stick s : sticks ){ //模擬時,可能因順序問題,結果不對稱
     Particle p1 = s.p1, p2 = s.p2;
     float C = C(s);
     PVector n = PVector.sub(p1.p, p2.p).normalize();
@@ -184,4 +189,8 @@ void mouseDragged(){ //讓布料的左上角,可以隨著 mouseDragged()移動
   Particle p = particles.get(0);
   p.p.x = p.x.x=mouseX-width/2;
   p.p.y = p.x.y=mouseY-height/2;
+}
+void mouseWheel(MouseEvent event){
+  float e = event.getCount();
+  sphere.z += e; //利用 mouse wheel 滾輪 調整大班的圓心, 以便測試 Collision
 }
