@@ -2,7 +2,7 @@
 //https://matthias-research.github.io/pages/publications/posBasedDyn.pdf
 class Particle{
   PVector x; //position
-  PVector p; //estimated position in simulation
+  PVector p; //estimated position in simulation (predicted position)
   PVector v; //velocity
   boolean locked;
   float w;
@@ -37,6 +37,15 @@ class Triangle{
     p[2] = _p2;
   }
 }
+class Collision{
+  Particle p;
+  PVector q_c;
+  Collision(Particle _p, PVector _q_c){
+    p = _p;
+    q_c = _q_c;
+  }
+}
+ArrayList<Collision> collisions;
 ArrayList<Stick> sticks;
 ArrayList<Particle> particles;
 ArrayList<Triangle> triangles;
@@ -45,6 +54,7 @@ void setup(){
   size(500, 500, P3D); //為了打光lights(), 所以改成 P3D
   generateCloth(400, 400, 20, 20); //這裡可調解析度,方便debug
   sphere = new PVector(0, 0, -100); //有一個大球, 用來研究 Collision Constraint
+  collisions = new ArrayList<Collision>();
 }
 void draw(){
   lights(); //想加上打光,不過三角面用半透明的話,有點怪怪的
@@ -56,10 +66,10 @@ void draw(){
     fill(255);
     sphere(100);
   popMatrix();
-  if(Q_c!=null){ //有collision發生時, 用小圓球把表面接觸點標示出來
-    for( PVector q_c : Q_c ){
+  if(collisions!=null){ //有collision發生時, 用小圓球把表面接觸點標示出來
+    for( Collision c : collisions ){
       pushMatrix();
-        translate(q_c.x, q_c.y, q_c.z);
+        translate(c.q_c.x, c.q_c.y, c.q_c.z);
         fill(255,0,0);
         sphere(5);
       popMatrix();
@@ -88,7 +98,7 @@ void draw(){
       ellipse( pt.x, pt.y, 7, 7); //固定的點畫大一點(locked)
     }
   }
-  if(mousePressed) Simulation();
+  if( keyPressed || mousePressed ) Simulation(); //「按鍵」也可觸發Simulation()
 }
 void Simulation(){
   float stiffness = 0.98; //照著 section 3.3 最後整合 solverIterations 及 stiffness
@@ -103,7 +113,7 @@ void Simulation(){
   }
   generateCollisionConstraints(); //(8) generateCollisionConstraints()
   for(int k=0; k<ns; k++){ //(9) solverIterations 越多次,越剛直, 所以用k2來修正回來
-    projectConstraints(k2); //(10) projectConstraints() in Gauss-Seidel fashion
+    projectConstraints(k2); //(10) projectConstraints() in Gauss-Seidel fashion (including collision)
   }
   for( Particle p : particles ){//(12) forall vertices i
     p.v = PVector.sub(p.p, p.x); //(13) vi = (pi-xi)/dt
@@ -112,28 +122,32 @@ void Simulation(){
     p.x.z = p.p.z;
   }
   //(16) velocityUpdate()
+  generateCollisionConstraints(); //想看看Simulation()後,為什麼還有Collision發生, 所以再跑一次
 }
-ArrayList<PVector> Q_c=null;
 void generateCollisionConstraints(){
-  if(Q_c==null) Q_c = new ArrayList<PVector>();
-  else Q_c.removeAll(Q_c);
+  if(collisions==null) collisions = new ArrayList<Collision>();
+  else collisions.removeAll(collisions);
   for( Particle p : particles ){
     if( PVector.dist(p.p, sphere)<100 ){ //estimated position 在圓球裡
       PVector q_c = calcContactPoint(sphere, p.x, p.p); //2種collision都在函式中解決
-      Q_c.add(q_c);
+      collisions.add( new Collision(p,q_c) );
     }
   }
-  println(Q_c.size());
+  println(" collisions.size():", collisions.size());
 }
 PVector calcContactPoint(PVector sphere, PVector x0, PVector p){ //已知: estimated position 在圓球裡
   //q_c contact point, n_c normal at contact point (continuous collision) 一裡一外
   //q_s surface point, n_s normal at surface point (static collision) 兩點都在裡面
-  if( PVector.dist(x0, sphere)<100 ){ //position 也在圓球裡, 用 static collision
-    print("+"); //static collision
-    PVector q_c = PVector.add( sphere, PVector.sub(p, sphere).normalize().mult(100) );//找p最近的圓球表面
+  //TODO: 下面有重覆計算距離, generateCollisionConstraints() 裡也有, 之後可改善
+  boolean xInside=PVector.dist(x0, sphere)<100;
+  boolean pInside=PVector.dist(p, sphere)<100;
+  if( !pInside ) return p; //p在外面, 很好, 直接用p的值
+  if( pInside && xInside ){ //position 也在圓球裡, 用 static collision
+    print("p"); //push predicted point out directly 直接往外推
+    PVector q_c = PVector.add( sphere, PVector.sub(p, sphere).normalize().mult(100+2) );//找p最近的圓球表面, magic number 遠離一些
     return q_c;
   }//下面則是一裡一外的狀況
-  PVector ray = PVector.sub(p, x0);
+  PVector ray = PVector.sub(p, x0).normalize(); //用單位長度,方便之後細調(外推)距離
   // x = x0.x+d*ray.x, y = x0.y+d*ray.y, z = x0.z+d*ray.z 直線方程式(x0 + d * ray)
   // (x-sphere.x)^2 + (y-sphere.y)^2 + (z-sphere.z)^2 = 100^2 把點代入圓球表面方程式
   // (x0.x+d*ray.x-sphere.x)^2 + (...)^2 + (...)^2 - 100000 = 0 努力展開
@@ -145,14 +159,14 @@ PVector calcContactPoint(PVector sphere, PVector x0, PVector p){ //已知: estim
   float inside = b*b-4*a*c; //這是要開根號的部分, 應該要大於0。但如果小於0, 那就無法解, 改找 p最近的圓球表面
   if(inside<0){
     print("出錯了出錯了");
-    PVector q_c = PVector.add( sphere, PVector.sub(p, sphere).normalize().mult(100) );//找p最近的圓球表面
+    PVector q_c = PVector.add( sphere, PVector.sub(p, sphere).normalize().mult(100+2) );//找p最近的圓球表面, magic number 遠離一些
     return q_c;
   }
-  print("="); //continuous collision
+  print("c"); //continuous collision
   float d1 = (-b + sqrt(inside)) / (2*a);
-  float d2 = (-b - sqrt(inside)) / (2*a);
-  if( abs(d1) > abs(d2) ) return PVector.add(x0, PVector.mult(ray,d2));
-  else return PVector.add(x0, PVector.mult(ray,d1));
+  float d2 = (-b - sqrt(inside)) / (2*a); //這裡的狀況, 應該是x在外面, p在裡面, 所以 d的值要小一點
+  if( abs(d1) > abs(d2) ) return PVector.add(x0, PVector.mult(ray,d2-2)); // magic number 遠離一些 (但是+1 or -1呢?)
+  else return PVector.add(x0, PVector.mult(ray,d1-2)); // magic number 遠離一些 (但是+1 or -1呢?)
 }
 void projectConstraints(float k2){
   //下面用不同的迴圈寫法,來檢查不同順序的結果
@@ -165,6 +179,29 @@ void projectConstraints(float k2){
     p1.p.add(dp1);
     p2.p.add(dp2);
   }
+  //Project Collection Constraints
+  for( Collision c : collisions ){
+    Particle p = c.p;
+    //PVector q_c = c.q_c;
+    //PVector n_c = PVector.sub(q_c, sphere).normalize();
+    //float C = PVector.dot( PVector.sub(p.p,q_c), n_c );
+    //gradient of C (px-qx, py-qy, pz-qz) dot (nx, ny, nz)
+    // C  (px-qx)*nx + (py-qy)*ny + (pz-qz)*nz
+    //不過論文中說 stiffness是1,所以先直接把點移到 q_c即可
+    p.p = calcContactPoint(sphere, p.x, p.p);
+    //if( PVector.dist(p.p, sphere)<100 ) print("哇!"); //都沒有哇!表示collisions都已在外面囉!
+  }
+  //有些點可能發生: Simulation前沒collision, 但Simulation後反而collision。論文說這不常見, 但真的發生了。
+  int bad=0;
+  for( Particle p : particles ){
+    if( PVector.dist(p.p, sphere)<100){
+      if(PVector.dist(p.x, sphere)>=100){
+        print("模擬後才碰撞!");
+      }else print("模擬前就碰撞!");
+      bad++;
+    }
+  }
+  if(bad>0)println();
 }
 void generateCloth(float w, float h, int wr, int hr){
   sticks = new ArrayList<Stick>();
@@ -236,6 +273,7 @@ void mouseDragged(){ //讓布料的左上角,可以隨著 mouseDragged()移動
   Particle p = particles.get(0);
   p.p.x = p.x.x=mouseX-width/2;
   p.p.y = p.x.y=mouseY-height/2;
+  p.p.z = p.x.z=0;
 }
 void mouseWheel(MouseEvent event){
   float e = event.getCount();
