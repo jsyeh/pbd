@@ -82,10 +82,10 @@ class Bend {
     float mother = q1.magSq() + q2.magSq() + q3.magSq() + q4.magSq();
     if(mother<0.0000000001) return;
     float param = - sqrt(1-d*d) * C() / mother;
-    p1.p.add(PVector.mult(q1,param));
-    p2.p.add(PVector.mult(q2,param));
-    p3.p.add(PVector.mult(q3,param));
-    p4.p.add(PVector.mult(q4,param));
+    if(!p1.locked) p1.p.add(PVector.mult(q1,param));
+    if(!p2.locked) p2.p.add(PVector.mult(q2,param));
+    if(!p3.locked) p3.p.add(PVector.mult(q3,param));
+    if(!p4.locked) p4.p.add(PVector.mult(q4,param));
   }
 }
 ArrayList<Particle> particles = new ArrayList<Particle>();
@@ -105,24 +105,30 @@ void draw() {
   for( Particle p : particles ) {
     p.draw();
   }
-  //if(keyPressed || ! mousePressed) Simulation();
-  //if(keyPressed) Simulation();
+  if(keyPressed || ! mousePressed) Simulation();
 }
-void keyPressed() {
-  Simulation();
+void keyPressed() { //按按鍵，可調整 theta0 預設角度
+  if(key=='-' && bends.get(0).theta0 > 0.1) { //按'0'，會減少角度
+    bends.get(0).theta0 -= 0.1; //修改bending 的預設角度
+  }else if(bends.get(0).theta0 < PI - 0.1) { //其他鍵，都會增加角度
+    bends.get(0).theta0 += 0.1; //修改bending 的預設角度
+  }
 }
-void mouseDragged() {
-  particles.get(3).x.x += mouseX-pmouseX;
-  particles.get(3).p.x += mouseX-pmouseX;
-  //particles.get(3).x.x = 150*cos(radians(mouseX));//+= mouseX-pmouseX;
-  //particles.get(3).x.y = 150*sin(radians(mouseX));//+= mouseX-pmouseX;
-  //particles.get(3).p.x = 150*cos(radians(mouseX));//+= mouseX-pmouseX;
-  //particles.get(3).p.y = 150*sin(radians(mouseX));//+= mouseX-pmouseX;
+float rotAngle = 60;
+void mouseDragged() { //滑鼠「左右拖曳」可暫改變（下方）頂點座標/角度（之後模擬會自動恢復）
+  //particles.get(3).x.x += mouseX-pmouseX;
+  //particles.get(3).p.x += mouseX-pmouseX;
+  rotAngle += mouseX - pmouseX;
+  particles.get(3).x.x = 150*cos(radians(rotAngle));
+  particles.get(3).x.y = 150*sin(radians(rotAngle));
+  particles.get(3).p.x = 150*cos(radians(rotAngle));
+  particles.get(3).p.y = 150*sin(radians(rotAngle));
 }
 void generateTwoTriangle() {
-  Particle p3 = new Particle(100, -150, 0);
+  Particle p3 = new Particle(100, -150, 0); //上方
   Particle p1 = new Particle(0, 0, -100), p2 = new Particle(0, 0, 100); //中間
-  Particle p4 = new Particle(100, 150, 0);
+  Particle p4 = new Particle(100, 150, 0); //下方
+  p1.locked = p2.locked = p3.locked = true; //先固定3個點，以便觀察
   particles.add(p1);
   particles.add(p2);
   particles.add(p3);
@@ -132,18 +138,21 @@ void generateTwoTriangle() {
   bends.add(new Bend(p1,p2,p3,p4));
 }
 void Simulation() {
-  int ns = 1;
+  int ns = 20; //模擬的 number of simulation
+  //目前少了「長度限制」，會拉太長，故先不處理gravity
+  //PVector gravity = new PVector(0, 0.98, 0);
   for( Particle p : particles ) {
     if(p.locked) continue; 
-    //p.v.add( gravity );
-    //p.v.mult(0.9);
-    //p.p = PVector.add(p.x, p.v);
+    //p.v.add( gravity ); //先不處理gravity
+    //p.v.mult(0.9);  //暫不處理位置、速度、加速度的更新
+    p.p = PVector.add(p.x, p.v);
   }
-  for(int k=0; k<ns; k++) {
+  for(int k=0; k<ns; k++) { //模擬的 number of simulation
     projectConstraints();
   }
   for( Particle p: particles ) {
-    p.v = PVector.sub(p.p, p.x);
+    if(p.locked) continue; //先固定一些點，以便觀察
+    //p.v = PVector.sub(p.p, p.x); //先不更新速度
     p.x.x = p.p.x;
     p.x.y = p.p.y;
     p.x.z = p.p.z;
