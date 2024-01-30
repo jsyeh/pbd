@@ -23,6 +23,14 @@ class Particle {
   Particle( float _x, float _y ) {
     this( _x, _y, 0.0, 0.0 );
   }
+  void draw() {
+    noStroke();
+    fill(#FF0000);
+    pushMatrix();
+      translate(x.x, x.y, x.z);
+      sphere(7);
+    popMatrix();
+  }
 }
 class Triangle {
   Particle [] p = new Particle[3];
@@ -30,6 +38,15 @@ class Triangle {
     p[0] = _p0;
     p[1] = _p1;
     p[2] = _p2;
+  }
+  void draw() {
+    PVector p0 = p[0].x, p1 = p[1].x, p2 = p[2].x;
+    fill(255, 0, 0, 128); stroke(0);
+    beginShape();
+      vertex(p0.x, p0.y, p0.z);
+      vertex(p1.x, p1.y, p1.z);
+      vertex(p2.x, p2.y, p2.z);
+    endShape(CLOSE);    
   }
 }
 class Bend {
@@ -83,22 +100,10 @@ void draw() {
   translate(width/2, height/2);
   rotateY(radians(30));
   for( Triangle t : triangles ) {
-    PVector p0 = t.p[0].x, p1 = t.p[1].x, p2 = t.p[2].x;
-    fill(255, 0, 0, 128); stroke(0);
-    beginShape();
-      vertex(p0.x, p0.y, p0.z);
-      vertex(p1.x, p1.y, p1.z);
-      vertex(p2.x, p2.y, p2.z);
-    endShape(CLOSE);
+    t.draw();
   }
   for( Particle p : particles ) {
-    PVector pt = p.x;
-    noStroke();
-    fill(#FF0000);
-    pushMatrix();
-      translate(pt.x, pt.y, pt.z);
-      sphere(7);
-    popMatrix();
+    p.draw();
   }
   //if(keyPressed || ! mousePressed) Simulation();
   //if(keyPressed) Simulation();
