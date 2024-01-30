@@ -92,7 +92,7 @@ void draw() {
     p.draw();
   }
   //if(keyPressed || ! mousePressed) Simulation();
-  Simulation();
+  Simulation(); //可一直持續模擬
 }
 
 void keyPressed() { //
@@ -108,7 +108,8 @@ void generateTwoTriangle() {
   Particle p3 = new Particle(100, -150, 0); //上方
   Particle p1 = new Particle(0, 0, -100), p2 = new Particle(0, 0, 100); //中間
   Particle p4 = new Particle(100, 150, 0); //下方
-  p3.locked = true; //先固定3個點，以便觀察
+  p3.locked = true; //固定1個點，以便觀察
+  p3.w = 0; // 也要設成0 才會在 projectConstraint() 時真固定
   particles.add(p1);
   particles.add(p2);
   particles.add(p3);
@@ -128,17 +129,16 @@ void Simulation() {
   PVector gravity = new PVector(0, 0.98, 0);
   for( Particle p : particles ) {
     if(p.locked) continue; 
-    p.v.add( gravity ); //先不處理gravity
-    p.v.mult(0.9);  //暫不處理位置、速度、加速度的更新
+    p.v.add( gravity ); //處理gravity
+    p.v.mult(0.999);  //處理位置、速度、加速度的更新
     p.p = PVector.add(p.x, p.v);
   }
   for(int k=0; k<ns; k++) { //模擬的 number of simulation
     projectConstraints();
   }
   for( Particle p: particles ) {
-    if(p.locked) continue; //先固定一些點，以便觀察
-    //p.v = PVector.sub(p.p, p.x); //先不更新速度
-    p.x.x = p.p.x;
+    p.v = PVector.sub(p.p, p.x); //更新速度
+    p.x.x = p.p.x; //更新位置
     p.x.y = p.p.y;
     p.x.z = p.p.z;
   }
