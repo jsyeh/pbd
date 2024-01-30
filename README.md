@@ -6,6 +6,8 @@ This is my implementation of Position Based Dynamics. The Processing Language is
 
 ![](interact_cloth.gif)
 
+![interact_stretch_rope](https://github.com/jsyeh/pbd/assets/3252557/43bc6457-12bb-4d89-bbbe-007cacc2ac4e)
+
 ## 目前實作進度
 
 半夜心血來潮, 照著 Position Based Dynamics 論文重新實作, 做到 Section 3.3 的簡單 case, 再照著 Yuki Koyama 建立布料的點、線、面規則, 配合2個頂點釘住, 進行 projectConstraints()實作。
